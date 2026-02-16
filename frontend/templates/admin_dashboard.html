@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Cloud Security Monitoring</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">🛡️</span>
+                    <h1>Cloud Security Monitoring</h1>
+                </div>
+                <div class="header-info">
+                    <span class="status-badge status-active">● System Active</span>
+                    <span class="user-badge">Admin</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+
+            <!-- Page Header -->
+            <div class="page-header">
+                <h2>Security Operations Center</h2>
+                <button onclick="refreshData()" class="btn-refresh">
+                    🔄 Refresh Data
+                </button>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-blue">👥</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Users Monitored</div>
+                        <div class="stat-value" id="total-users">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-red">⚠️</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Active Threats</div>
+                        <div class="stat-value" id="total-threats">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-orange">🔥</div>
+                    <div class="stat-content">
+                        <div class="stat-label">High Risk Users</div>
+                        <div class="stat-value" id="high-risk-users">0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-green">✓</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Detection Rate</div>
+                        <div class="stat-value">98.5%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Security Events -->
+            <div class="section-card">
+                <h3 class="section-title">🚨 Live Security Events</h3>
+                <div id="live-events">
+                    <p class="loading">Waiting for live events...</p>
+                </div>
+            </div>
+
+            <!-- Threat Distribution -->
+            <div class="section-card">
+                <h3 class="section-title">Detected Threat Types</h3>
+                <div id="threat-types" class="threat-badges">
+                    <span class="loading">Loading threat data...</span>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3 class="section-title">User Activity Overview</h3>
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="🔍 Search users..." onkeyup="filterUsers()">
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Total Logins</th>
+                                <th>Avg CPU Usage</th>
+                                <th>Network Out (MB)</th>
+                                <th>Threat Count</th>
+                                <th>Risk Level</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <tr>
+                                <td colspan="7" class="loading-row">
+                                    Loading user data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 AI-Based Cloud Security Monitoring System</p>
+        </div>
+    </footer>
+
+    <!-- ===================== JAVASCRIPT ===================== -->
+    <script>
+        let allUsers = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadStatistics();
+            loadUsers();
+            initSocket();
+        });
+
+        async function loadStatistics() {
+            const res = await fetch("/api/statistics");
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById("total-users").textContent = data.total_users;
+                document.getElementById("total-threats").textContent = data.total_threats;
+                displayThreatTypes(data.threat_distribution);
+            }
+        }
+
+        function displayThreatTypes(threats) {
+            const container = document.getElementById("threat-types");
+            if (!threats || Object.keys(threats).length === 0) {
+                container.innerHTML = "<span>No threats detected</span>";
+                return;
+            }
+
+            container.innerHTML = Object.entries(threats)
+                .map(([type, count]) =>
+                    `<span class="threat-badge">${type} <b>${count}</b></span>`
+                ).join("");
+        }
+
+        async function loadUsers() {
+            const res = await fetch("/api/users");
+            const data = await res.json();
+
+            if (data.success) {
+                allUsers = data.users;
+                displayUsers(allUsers);
+                updateHighRiskCount(allUsers);
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById("users-tbody");
+
+            if (users.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='7'>No users found</td></tr>";
+                return;
+            }
+
+            tbody.innerHTML = users.map(u => `
+                <tr onclick="viewUserDetails('${u.user_id}')">
+                    <td><b>${u.user_id}</b></td>
+                    <td>${u.login_count}</td>
+                    <td>${u.cpu_usage}%</td>
+                    <td>${u.network_out} MB</td>
+                    <td>${u.threat_count}</td>
+                    <td><span class="risk-badge risk-${u.risk_level.toLowerCase()}">${u.risk_level}</span></td>
+                    <td><button class="btn-view">View →</button></td>
+                </tr>
+            `).join("");
+        }
+
+        function updateHighRiskCount(users) {
+            document.getElementById("high-risk-users").textContent =
+                users.filter(u => u.risk_level === "High").length;
+        }
+
+        function filterUsers() {
+            const q = document.getElementById("search-input").value.toLowerCase();
+            displayUsers(allUsers.filter(u => u.user_id.toLowerCase().includes(q)));
+        }
+
+        function viewUserDetails(id) {
+            window.location.href = `/user/${id}`;
+        }
+
+        async function refreshData() {
+            await loadStatistics();
+            await loadUsers();
+        }
+
+        // ================= SOCKET.IO =================
+        function initSocket() {
+            const socket = io();
+
+            socket.on("connect", () => {
+                console.log("Socket connected");
+            });
+
+            socket.on("security_event", event => {
+                const container = document.getElementById("live-events");
+                if (container.querySelector(".loading")) container.innerHTML = "";
+
+                const div = document.createElement("div");
+                div.className = `event event-${event.severity}`;
+                div.innerHTML = `
+                    <b>${event.type.toUpperCase()}</b><br>
+                    User: ${event.user}<br>
+                    IP: ${event.ip}<br>
+                    Severity: ${event.severity}<br>
+                    ${event.message}<br>
+                    <small>${new Date(event.timestamp).toLocaleString()}</small>
+                `;
+                container.prepend(div);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details - {{ user.user_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">🛡️</span>
+                    <h1>Cloud Security Monitoring</h1>
+                </div>
+                <div class="header-info">
+                    <span class="status-badge status-active">● System Active</span>
+                    <span class="user-badge">Admin</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Back Button -->
+            <div class="breadcrumb">
+                <a href="/admin" class="btn-back">← Back to Admin Dashboard</a>
+            </div>
+
+            <!-- User Header -->
+            <div class="user-header">
+                <div class="user-info">
+                    <div class="user-avatar">{{ user.user_id[0] }}</div>
+                    <div>
+                        <h2>{{ user.user_id }}</h2>
+                        <p class="user-subtitle">User Activity Profile</p>
+                    </div>
+                </div>
+                <div class="user-risk">
+                    <span class="risk-badge risk-{{ user.highest_risk.lower() }} large">
+                        {{ user.highest_risk }} Risk
+                    </span>
+                </div>
+            </div>
+
+            <!-- Statistics Overview -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-blue">🔑</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Logins</div>
+                        <div class="stat-value">{{ user.total_logins }}</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-purple">💻</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg CPU Usage</div>
+                        <div class="stat-value">{{ user.avg_cpu_usage }}%</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-cyan">📤</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Network Out</div>
+                        <div class="stat-value">{{ user.avg_network_out }} MB</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon-red">⚠️</div>
+                    <div class="stat-content">
+                        <div class="stat-label">Detected Threats</div>
+                        <div class="stat-value">{{ user.threat_count }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detected Threats Section -->
+            {% if user.threats %}
+            <div class="section-card alert-section">
+                <div class="alert-header">
+                    <h3 class="section-title">🚨 Security Alerts</h3>
+                    <span class="alert-count">{{ user.threat_count }} Active Threat(s)</span>
+                </div>
+
+                <div class="threats-grid">
+                    {% for threat in user.threats %}
+                    <div class="threat-card threat-{{ threat.risk_level.lower() }}">
+                        <div class="threat-header">
+                            <span class="threat-type">{{ threat.attack_type }}</span>
+                            <span class="threat-risk risk-badge risk-{{ threat.risk_level.lower() }}">
+                                {{ threat.risk_level }}
+                            </span>
+                        </div>
+                        <div class="threat-details">
+                            <div class="threat-metric">
+                                <span class="metric-label">CPU Usage:</span>
+                                <span class="metric-value">{{ threat.cpu_usage }}%</span>
+                            </div>
+                            <div class="threat-metric">
+                                <span class="metric-label">Network Out:</span>
+                                <span class="metric-value">{{ threat.network_out }} MB</span>
+                            </div>
+                            <div class="threat-metric">
+                                <span class="metric-label">Anomaly Score:</span>
+                                <span class="metric-value">{{ "%.3f"|format(threat.anomaly_score) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="section-card success-section">
+                <div class="success-message">
+                    <div class="success-icon">✓</div>
+                    <div>
+                        <h3>No Security Threats Detected</h3>
+                        <p>This user's activity appears normal and within expected parameters.</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Activity Logs Section -->
+            <div class="section-card">
+                <h3 class="section-title">Activity Logs</h3>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Login Count</th>
+                                <th>CPU Usage (%)</th>
+                                <th>Network In (MB)</th>
+                                <th>Network Out (MB)</th>
+                                <th>Login Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in user.activity_logs %}
+                            <tr>
+                                <td>{{ log.login_count }}</td>
+                                <td>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {{ log.cpu_usage }}%"></div>
+                                        <span class="progress-text">{{ log.cpu_usage }}%</span>
+                                    </div>
+                                </td>
+                                <td>{{ log.network_in }} MB</td>
+                                <td>{{ log.network_out }} MB</td>
+                                <td>
+                                    {% if log.login_status == 'success' %}
+                                    <span class="status-badge status-success">Success</span>
+                                    {% else %}
+                                    <span class="status-badge status-failed">Failed</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recommendations Section -->
+            <div class="section-card recommendations">
+                <h3 class="section-title">💡 Security Recommendations</h3>
+                <div class="recommendation-list">
+                    {% if user.highest_risk == 'High' %}
+                    <div class="recommendation-item critical">
+                        <span class="rec-icon">🔴</span>
+                        <div>
+                            <strong>Immediate Action Required</strong>
+                            <p>This account shows high-risk behavior. Consider temporarily suspending access and conducting a security review.</p>
+                        </div>
+                    </div>
+                    <div class="recommendation-item critical">
+                        <span class="rec-icon">🔒</span>
+                        <div>
+                            <strong>Enable Multi-Factor Authentication</strong>
+                            <p>Require additional authentication steps to prevent unauthorized access.</p>
+                        </div>
+                    </div>
+                    {% elif user.highest_risk == 'Medium' %}
+                    <div class="recommendation-item warning">
+                        <span class="rec-icon">🟡</span>
+                        <div>
+                            <strong>Monitor Closely</strong>
+                            <p>Continue monitoring this account for unusual patterns. Consider implementing stricter access controls.</p>
+                        </div>
+                    </div>
+                    <div class="recommendation-item warning">
+                        <span class="rec-icon">📧</span>
+                        <div>
+                            <strong>Send Security Alert</strong>
+                            <p>Notify the user about detected anomalies and request verification of recent activities.</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="recommendation-item normal">
+                        <span class="rec-icon">🟢</span>
+                        <div>
+                            <strong>Normal Activity Detected</strong>
+                            <p>Continue routine monitoring. No immediate action required.</p>
+                        </div>
+                    </div>
+                    <div class="recommendation-item normal">
+                        <span class="rec-icon">📊</span>
+                        <div>
+                            <strong>Maintain Security Best Practices</strong>
+                            <p>Encourage regular password updates and security awareness training.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <a href="/admin" class="btn btn-primary">← Back to Dashboard</a>
+                <button onclick="exportReport()" class="btn btn-secondary">📥 Export Report</button>
+                <button onclick="sendAlert()" class="btn btn-danger">📧 Send Security Alert</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 AI-Based Cloud Security Monitoring System | Final Year Capstone Project</p>
+        </div>
+    </footer>
+
+    <script>
+        function exportReport() {
+            alert('Report export functionality would be implemented here.\nThis would generate a PDF or CSV report of the user\'s activity.');
+        }
+
+        function sendAlert() {
+            const confirmed = confirm('Send a security alert to {{ user.user_id }}?\n\nThis will notify the user about detected anomalies.');
+            if (confirmed) {
+                alert('Security alert sent successfully!\n\nIn production, this would trigger an email/SMS notification to the user.');
+            }
+        }
+    </script>
+</body>
+</html>
