@@ -7,6 +7,7 @@ from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
 import pandas as pd
 import os
+import requests as req
 from datetime import datetime
 
 # -------------------------------------------------
@@ -16,7 +17,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(
     __name__,
-    template_folder="templates",
+    template_folder='../frontend/templates',
     static_folder="static"
 )
 
@@ -25,8 +26,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # -------------------------------------------------
 # Dataset Paths
 # -------------------------------------------------
-CLOUD_LOGS_PATH = os.path.join(BASE_DIR, "dataset", "cloud_logs.csv")
-THREATS_PATH = os.path.join(BASE_DIR, "dataset", "detected_threats.csv")
+CLOUD_LOGS_PATH = os.path.join(BASE_DIR, "..", "dataset", "cloud_logs.csv")
+THREATS_PATH = os.path.join(BASE_DIR, "..", "dataset", "detected_threats.csv")
 
 # -------------------------------------------------
 # Data Loading
@@ -61,6 +62,10 @@ def get_user_summary():
         "network_out": "mean"
     }).reset_index()
 
+    user_stats["cpu_usage"] = user_stats["cpu_usage"].round(2)
+    user_stats["network_in"] = user_stats["network_in"].round(2)
+    user_stats["network_out"] = user_stats["network_out"].round(2)
+
     if not threats.empty:
         threat_counts = threats.groupby("user_id").size().reset_index(name="threat_count")
         user_stats = user_stats.merge(threat_counts, on="user_id", how="left")
@@ -78,6 +83,7 @@ def get_user_summary():
 
     user_stats.fillna({"threat_count": 0, "risk_level": "Normal"}, inplace=True)
     return user_stats.to_dict("records")
+
 
 def get_user_details(user_id):
     cloud_logs, threats = load_data()
@@ -115,14 +121,14 @@ def get_user_details(user_id):
 @app.route("/")
 @app.route("/admin")
 def admin_dashboard():
-    return render_template("admindashboard.html")
+    return render_template("admin_dashboard.html")
 
 @app.route("/user/<user_id>")
 def user_detail(user_id):
     user = get_user_details(user_id)
     if not user:
         return "User not found", 404
-    return render_template("userdetails.html", user=user)
+    return render_template("user_detail.html", user=user)
 
 # -------------------------------------------------
 # API Routes
@@ -138,6 +144,41 @@ def api_user(user_id):
     if not user:
         return jsonify({"success": False}), 404
     return jsonify({"success": True, "user": user})
+
+@app.route("/api/statistics")
+def api_statistics():
+    cloud_logs, threats = load_data()
+    return jsonify({
+        "success": True,
+        "total_users": len(cloud_logs["user_id"].unique()) if not cloud_logs.empty else 0,
+        "total_threats": len(threats) if not threats.empty else 0,
+        "threat_distribution": threats["attack_type"].value_counts().to_dict() if not threats.empty else {},
+        "risk_distribution": threats["risk_level"].value_counts().to_dict() if not threats.empty else {}
+    })
+
+# -------------------------------------------------
+# AI SOC Assistant (Ollama)
+# -------------------------------------------------
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json()
+    user_message = data.get("message", "")
+
+    try:
+        response = req.post("http://localhost:11434/api/generate", json={
+            "model": "llama3",
+            "prompt": (
+                "You are an AI security analyst assistant for a cloud security monitoring system. "
+                "Help analyze threats, explain attack types, and give security recommendations.\n\n"
+                f"User: {user_message}\nAssistant:"
+            ),
+            "stream": False
+        })
+        reply = response.json()["response"]
+    except Exception as e:
+        reply = f"AI assistant error: {str(e)}"
+
+    return jsonify({"reply": reply})
 
 # -------------------------------------------------
 # REAL-TIME SECURITY EVENTS (Socket.IO)
