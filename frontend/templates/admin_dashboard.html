@@ -248,3 +248,35 @@
     </script>
 </body>
 </html>
+<hr>
+<h2>AI SOC Assistant</h2>
+
+<div id="chatbox" style="border:1px solid #ccc; height:300px; overflow-y:auto; padding:10px;"></div>
+
+<input type="text" id="message" placeholder="Ask security assistant..." style="width:80%;">
+<button onclick="sendMessage()">Send</button>
+
+<script>
+async function sendMessage() {
+    const msgInput = document.getElementById("message");
+    const msg = msgInput.value;
+
+    if (!msg) return;
+
+    document.getElementById("chatbox").innerHTML += 
+        "<p><b>You:</b> " + msg + "</p>";
+
+    const response = await fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message: msg})
+    });
+
+    const data = await response.json();
+
+    document.getElementById("chatbox").innerHTML += 
+        "<p><b>AI:</b> " + data.reply + "</p>";
+
+    msgInput.value = "";
+}
+</script>
